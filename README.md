@@ -187,6 +187,8 @@ First, we need to install Chocolatey, a package manager for Windows that simplif
 
 ## Step 6: Clone the Base VM for Multiple Instances
 
+TODO: Tweaking of the Kernel parameters
+
 1. **Create a Clone of the Base Image**:
    ```powershell
    qemu-img create -f qcow2 -b D:\arm-ubuntu-qemu\ubuntu-arm64.qcow2 D:\arm-ubuntu-qemu\ubuntu-arm64-clone.qcow2
@@ -194,7 +196,7 @@ First, we need to install Chocolatey, a package manager for Windows that simplif
 
 2. **Run the Cloned VM**:
    ```powershell
-   emu-system-aarch64 -name ubuntu-arm64 -machine virt -cpu cortex-a53 -smp 2 -m 2048 -bios D:\arm-ubuntu-qemu\QEMU_EFI.fd -drive if=none,file=D:\arm-ubuntu-qemu\ubuntu-arm64.qcow2,id=hd0,format=qcow2 -device virtio-blk-device,drive=hd0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-gpu -nographic -serial mon:stdio
+   qemu-system-aarch64 -name ubuntu-arm64 -machine virt -cpu cortex-a53 -smp 2 -m 6177 -bios D:\arm-ubuntu-qemu\QEMU_EFI.fd -drive if=none,file=D:\arm-ubuntu-qemu\ubuntu-arm64.qcow2,id=hd0,format=qcow2 -device virtio-blk-device,drive=hd0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-gpu -nographic -serial mon:stdio
    ```
 
 3. **SSH into the Cloned VM**:
@@ -228,6 +230,3 @@ First, we need to install Chocolatey, a package manager for Windows that simplif
 By following these steps, you can create and run an Ubuntu 18.04 ARM aarch64 guest VM on Windows 11 using QEMU with NAT networking, set up SSH access, and prepare the VM for various AWS Greengrass Core V2 experiments.
 
 Feel free to customize this blog post further to suit your style and add any additional details or images that might help your readers.
-```
-
-This markdown version is designed for easy readability and formatting on GitHub. Feel free to adjust and add any additional details or images to enhance your blog post.
