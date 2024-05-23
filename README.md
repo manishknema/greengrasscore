@@ -639,6 +639,104 @@ You might also need `pip` for managing Python packages:
 While Python 3.10 may work for your projects, using Python 3.7 or 3.8 ensures compatibility with AWS IoT Greengrass Core. Follow the steps above to install Python 3.8 on Ubuntu 18.04, which is a supported version for running Greengrass Lambda functions.
 
 If you still prefer using Python 3.10, ensure thorough testing as you might encounter compatibility issues, and it may not be officially supported by AWS IoT Greengrass Core.  
+#### Installing AWS CLI
+
+Yes, the AWS CLI is often required for AWS IoT Greengrass Core manual installation and management. It allows you to configure, deploy, and manage Greengrass groups and devices. Below are the steps to install and configure the AWS CLI on Ubuntu 18.04 aarch64.
+
+
+##### Step 1: Update Your Package List
+
+Open a terminal and update your package list:
+
+```bash
+sudo apt update
+```
+
+##### Step 2: Install Required Packages
+
+Install `curl` and `unzip` if they are not already installed:
+
+```bash
+sudo apt install curl unzip -y
+```
+
+##### Step 3: Download the AWS CLI Installation Script
+
+Download the AWS CLI version 2 installation script:
+
+```bash
+curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+```
+
+##### Step 4: Unzip the Installation Script
+
+Unzip the downloaded file:
+
+```bash
+unzip awscliv2.zip
+```
+
+##### Step 5: Run the Installation Script
+
+Run the AWS CLI installation script:
+
+```bash
+sudo ./aws/install
+```
+
+##### Step 6: Verify the Installation
+
+Check the AWS CLI version to verify the installation:
+
+```bash
+aws --version
+```
+
+You should see output similar to:
+
+```plaintext
+aws-cli/2.15.57 Python/3.11.8 Linux/4.15.0-213-generic exe/aarch64.ubuntu.18
+```
+
+##### Step 7: Configure the AWS CLI
+
+Configure the AWS CLI with your AWS credentials:
+
+```bash
+aws configure --profile dev-admin
+```
+
+You will be prompted to enter your AWS Access Key ID, Secret Access Key, default region name, and default output format.
+
+Example:
+
+```plaintext
+AWS Access Key ID [None]: YOUR_ACCESS_KEY_ID
+AWS Secret Access Key [None]: YOUR_SECRET_ACCESS_KEY
+Default region name [None]: us-west-2
+Default output format [None]: json
+```
+You can check configured profiles with following commands
+```bash
+aws configure list-profiles
+```
+Edit your .profile to configure `AWS_PROFILE` environment variable
+```bash
+vi ~/.profile
+```
+At the end of the file enter the following 
+```bash
+export AWS_PROFILE=dev-admin 
+```
+Save and Exit 
+
+Run the profile file
+```bash
+. ~/.profile
+```
+Check by running any aws cli command e.g. `aws s3 ls` 
+It should produce some output if yes you are done with AWS CLI configuration
+
 
 ## Running multiple instances of same qcow2 image in QEMU
 Instance 1
