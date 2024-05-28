@@ -1,3 +1,42 @@
+- [Setting Up ARM-based Ubuntu 18.04 for AWS Greengrass Core](#setting-up-arm-based-ubuntu-1804-for-aws-greengrass-core)
+  - [Why QEMU](#why-qemu)
+    - [Recommended Approach: QEMU](#recommended-approach-qemu)
+- [Setting Up ARM-based Ubuntu 18.04 for AWS Greengrass Core on Windows 11](#setting-up-arm-based-ubuntu-1804-for-aws-greengrass-core-on-windows-11)
+  - [Step 1: Install Chocolatey on Windows 11](#step-1-install-chocolatey-on-windows-11)
+  - [Step 3: Download and Use `QEMU_EFI.fd`](#step-3-download-and-use-qemu_efifd)
+  - [Step 4: Create the Ubuntu 18.04 ARM aarch64 Base Image](#step-4-create-the-ubuntu-1804-arm-aarch64-base-image)
+  - [Step 5: Configure OpenSSH in the Guest VM](#step-5-configure-openssh-in-the-guest-vm)
+  - [Step 6: Clone the Base VM for Multiple Instances](#step-6-clone-the-base-vm-for-multiple-instances)
+    - [Kernel tuning for Greengrass Core V2](#kernel-tuning-for-greengrass-core-v2)
+    - [Step-by-Step Guide to Enable Source Repositories and Download Kernel Source](#step-by-step-guide-to-enable-source-repositories-and-download-kernel-source)
+    - [Step-by-Step Guide to Manually Edit the Kernel Configuration](#step-by-step-guide-to-manually-edit-the-kernel-configuration)
+      - [Step 1: Download the Kernel Source Code](#step-1-download-the-kernel-source-code)
+      - [Step 2: Copy Current Kernel Configuration](#step-2-copy-current-kernel-configuration)
+      - [Step 3: Manually Edit the `.config` File](#step-3-manually-edit-the-config-file)
+      - [Step 4: Compile and Install the Kernel](#step-4-compile-and-install-the-kernel)
+      - [Step 5: Update Bootloader](#step-5-update-bootloader)
+      - [Step 6: Verify the Configuration](#step-6-verify-the-configuration)
+    - [Step 7: Configure GRUB for cgroup Settings](#step-7-configure-grub-for-cgroup-settings)
+  - [Step 7: Verify following commands else install them](#step-7-verify-following-commands-else-install-them)
+      - [Check glibc version](#check-glibc-version)
+      - [The /tmp directory must be mounted with exec permissions.](#the-tmp-directory-must-be-mounted-with-exec-permissions)
+      - [Install Java or openjdk](#install-java-or-openjdk)
+      - [Reasons to Use Supported Versions (Python 3.7 or 3.8)](#reasons-to-use-supported-versions-python-37-or-38)
+      - [Installing Python 3.8 on Ubuntu 18.04](#installing-python-38-on-ubuntu-1804)
+      - [Installing Python Packages](#installing-python-packages)
+      - [Summary](#summary)
+      - [Installing AWS CLI](#installing-aws-cli)
+        - [Step 1: Update Your Package List](#step-1-update-your-package-list)
+        - [Step 2: Install Required Packages](#step-2-install-required-packages)
+        - [Step 3: Download the AWS CLI Installation Script](#step-3-download-the-aws-cli-installation-script)
+        - [Step 4: Unzip the Installation Script](#step-4-unzip-the-installation-script)
+        - [Step 5: Run the Installation Script](#step-5-run-the-installation-script)
+        - [Step 6: Verify the Installation](#step-6-verify-the-installation)
+        - [Step 7: Configure the AWS CLI](#step-7-configure-the-aws-cli)
+  - [Running multiple instances of same qcow2 image in QEMU](#running-multiple-instances-of-same-qcow2-image-in-qemu)
+  - [Step 8: Experiment with AWS Greengrass Core V2](#step-8-experiment-with-aws-greengrass-core-v2)
+  - [Summary](#summary-1)
+
 # Setting Up ARM-based Ubuntu 18.04 for AWS Greengrass Core
 I wanted to see for one project how [AWS Greengrass Core V2](https://docs.aws.amazon.com/greengrass/v2/developerguide/what-is-iot-greengrass.html) is beneficial for local processing and Since most of the IoT Edge devices are based on the ARM architecture and very constraint typically 8-12 GB RAM and 10-100 GB Disk with/without GPU/NPU. I want to test out features of Greengrass before going full blown deployment in actual devices. 
 
@@ -755,10 +794,12 @@ Explanation of Changes
 ## Step 8: Experiment with AWS Greengrass Core V2
 
 1. **Manual Installation of Greengrass Core V2**:
-   - Follow the [AWS Greengrass Core V2 installation guide](https://docs.aws.amazon.com/greengrass/v2/developerguide/manual-installation.html) to manually install Greengrass Core V2 on your VM.
-    - **Please tune to this GitHub post I will keep you posted around this**
+   - please check these instructions with install and uninstall shell script in [GGCV2-manual-install](GGCV2-manual-install.md)
+    - This is based on  [AWS Greengrass Core V2 installation guide](https://docs.aws.amazon.com/greengrass/v2/developerguide/manual-installation.html) to manually install Greengrass Core V2 on your VM.
+   
+   
 
-2. **Experiment with Fleet Provisioning**:
+1. **Experiment with Fleet Provisioning**:
    - Use the [AWS IoT Greengrass V2 Fleet Provisioning guide](https://docs.aws.amazon.com/greengrass/v2/developerguide/fleet-provisioning.html) to set up fleet provisioning for your VM instances.
    -  **Please tune to this GitHub post I will keep you posted around this**
 
