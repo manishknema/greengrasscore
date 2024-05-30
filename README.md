@@ -1,4 +1,16 @@
 - [Setting Up ARM-based Ubuntu 18.04 for AWS Greengrass Core](#setting-up-arm-based-ubuntu-1804-for-aws-greengrass-core)
+  - [Using EC2](#using-ec2)
+    - [Step 1: Create and Attach a New EBS Volume](#step-1-create-and-attach-a-new-ebs-volume)
+    - [Step 2: Prepare and Mount the EBS Volume on the EC2 Instance](#step-2-prepare-and-mount-the-ebs-volume-on-the-ec2-instance)
+    - [Step 4: Configure `/etc/fstab` for Automatic Mounting](#step-4-configure-etcfstab-for-automatic-mounting)
+  - [AWS Greegrass Lambda function languages](#aws-greegrass-lambda-function-languages)
+- [Greengrass V2 prerequisites](#greengrass-v2-prerequisites)
+    - [Create an Administrator user in IAM in AWS Console](#create-an-administrator-user-in-iam-in-aws-console)
+    - [Setup Python 3.10](#setup-python-310)
+      - [Step-by-Step Instructions:](#step-by-step-instructions)
+      - [Setting Python 3.10 as the Default Python Version (Optional)](#setting-python-310-as-the-default-python-version-optional)
+      - [Installing Pip for Python 3.10](#installing-pip-for-python-310)
+    - [Install AWS CLI](#install-aws-cli)
   - [Why QEMU](#why-qemu)
     - [Recommended Approach: QEMU](#recommended-approach-qemu)
 - [Setting Up ARM-based Ubuntu 18.04 for AWS Greengrass Core on Windows 11](#setting-up-arm-based-ubuntu-1804-for-aws-greengrass-core-on-windows-11)
@@ -21,6 +33,7 @@
       - [Check glibc version](#check-glibc-version)
       - [The /tmp directory must be mounted with exec permissions.](#the-tmp-directory-must-be-mounted-with-exec-permissions)
       - [Install Java or openjdk](#install-java-or-openjdk)
+      - [apt\_pkg not found issue](#apt_pkg-not-found-issue)
       - [Reasons to Use Supported Versions (Python 3.7 or 3.8)](#reasons-to-use-supported-versions-python-37-or-38)
       - [Installing Python 3.8 on Ubuntu 18.04](#installing-python-38-on-ubuntu-1804)
       - [Installing Python Packages](#installing-python-packages)
@@ -39,6 +52,405 @@
 
 # Setting Up ARM-based Ubuntu 18.04 for AWS Greengrass Core
 I wanted to see for one project how [AWS Greengrass Core V2](https://docs.aws.amazon.com/greengrass/v2/developerguide/what-is-iot-greengrass.html) is beneficial for local processing and Since most of the IoT Edge devices are based on the ARM architecture and very constraint typically 8-12 GB RAM and 10-100 GB Disk with/without GPU/NPU. I want to test out features of Greengrass before going full blown deployment in actual devices. 
+
+## Using EC2 
+
+You can alternatively try Ubuntu 22.04 based ARM (aarch64) machine I have used later after QEMU based installation and check the [Kernel tuning for Greengrass Core V2](#kernel-tuning-for-greengrass-core-v2) Here is what I have used
+- output of `cat /etc/lsb-release`
+```plaintext
+DISTRIB_ID=Ubuntu
+DISTRIB_RELEASE=24.04
+DISTRIB_CODENAME=noble
+DISTRIB_DESCRIPTION="Ubuntu 24.04 LTS" 
+````
+- The EC2 type 't4g.xlarge' vCPU=4 Memory=16GiB, I have also attached extra 100GB of volume
+
+As per the [page](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) I didnt have enough space in root volume so I have attached separate disk for the EC2 instance with 100 GB of volume and here is how i setup space for */tmp* and */greengrass* on new disk
+
+To set up a new 100GB disk on your EC2 instance and mount both `/tmp` and the Greengrass software directory to this new disk, follow these steps:
+
+### Step 1: Create and Attach a New EBS Volume
+
+1. **Create the EBS Volume**:
+   - Go to the AWS Management Console.
+   - Navigate to the EC2 Dashboard.
+   - Click on "Volumes" under the "Elastic Block Store" section.
+   - Click on "Create Volume."
+   - Specify the size as 100GB and select the appropriate volume type.
+   - Ensure the Availability Zone matches that of your EC2 instance.
+   - Click "Create Volume."
+
+2. **Attach the Volume to Your EC2 Instance**:
+   - After creating the volume, select it from the "Volumes" list.
+   - Click "Actions" and choose "Attach Volume."
+   - Select your EC2 instance from the dropdown.
+   - Specify a device name (e.g., `/dev/sdf`).
+   - Click "Attach Volume."
+
+### Step 2: Prepare and Mount the EBS Volume on the EC2 Instance
+
+1. **SSH into Your EC2 Instance**:
+   - Use SSH to connect to your instance:
+     ```sh
+     ssh -i /path/to/your-key.pem ec2-user@your-instance-public-dns
+     ```
+
+2. **List the Available Disks**:
+   - Run the following command to list all attached disks:
+     ```sh
+     lsblk
+     ```
+     or 
+
+     ```sh
+     fdisk -l
+     ```
+   - Look for the newly attached disk (e.g., `/dev/nvme1n1`).
+   - the output will be something like this for `fdisk -l` command
+    ```sh
+    Disk /dev/loop0: 21.84 MiB, 22904832 bytes, 44736 sectors
+    Units: sectors of 1 * 512 = 512 bytes
+    Sector size (logical/physical): 512 bytes / 512 bytes
+    I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+    Disk /dev/loop1: 49.12 MiB, 51503104 bytes, 100592 sectors
+    Units: sectors of 1 * 512 = 512 bytes
+    Sector size (logical/physical): 512 bytes / 512 bytes
+    I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+    Disk /dev/loop2: 33.65 MiB, 35287040 bytes, 68920 sectors
+    Units: sectors of 1 * 512 = 512 bytes
+    Sector size (logical/physical): 512 bytes / 512 bytes
+    I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+    Disk /dev/nvme1n1: 100 GiB, 107374182400 bytes, 209715200 sectors
+    Disk model: Amazon Elastic Block Store
+    Units: sectors of 1 * 512 = 512 bytes
+    Sector size (logical/physical): 512 bytes / 512 bytes
+    I/O size (minimum/optimal): 4096 bytes / 4096 bytes
+   ```
+   Here I can see `/dev/nvme1n1: 100 GiB` is my newly added EBS volume
+
+3. **Check if the Disk is Already Formatted**:
+   - Use the `file` command to check if the disk has a filesystem:
+     ```sh
+     sudo file -s /dev/nvme1n1
+     ```
+    if the output doesnt show any filesystem like `ext4` or `ext3` then it will look like this
+    ```sh
+    /dev/nvme1n1: data
+    ```
+4. **Format the Disk (if necessary)**:
+   - If the disk is not formatted, format it with the ext4 filesystem:
+     ```sh
+     sudo mkfs -t ext4 /dev/nvme1n1
+     ```
+
+5. **Create Mount Points**:
+   - Create directories for mounting the new disk:
+     ```sh
+     sudo mkdir -p /mnt/newdisk
+     
+     ```
+
+6. **Mount the Disk**:
+   - Mount the disk to the new mount point:
+     ```sh
+     sudo mount /dev/nvme1n1 /mnt/newdisk
+     ```
+   - Create `/tmp` and `/greengrass` directories in `/mnt/newdisk`
+    ```sh
+    sudo mkdir -p /mnt/newdisk/tmp
+    sudo mkdir -p /mnt/newdisk/greengrass
+    ```
+7. **Verify the Mount**:
+   - Check that the disk is mounted correctly:
+     ```sh
+     df -h
+     ```
+    it should show the new disk `/dev/nvme1n1` mounted on `/mnt/newdisk`
+    ```sh
+    Filesystem       Size  Used Avail Use% Mounted on
+    /dev/root        6.8G  1.6G  5.2G  24% /
+    tmpfs            7.7G     0  7.7G   0% /dev/shm
+    tmpfs            3.1G  1.1M  3.1G   1% /run
+    tmpfs            5.0M     0  5.0M   0% /run/lock
+    efivarfs         128K  3.4K  125K   3% /sys/firmware/efi/efivars
+    /dev/nvme0n1p16  891M   57M  772M   7% /boot
+    /dev/nvme0n1p15   98M  6.4M   92M   7% /boot/efi
+    tmpfs            1.6G   12K  1.6G   1% /run/user/1000
+    /dev/nvme1n1      98G   24K   93G   1% /mnt/newdisk
+    ```
+### Step 3: Move `/tmp` and install Greengrass Software to the New Disk
+
+1. **Move `/tmp` Directory**:
+   - Move the contents of the current `/tmp` directory to the new location:
+     ```sh
+     sudo mv /tmp/* /mnt/newdisk/tmp
+     ```
+
+   - Unmount the `/tmp` directory (if it is in use, you might need to stop services that are using `/tmp`):
+     ```sh
+     sudo umount /tmp
+     ```
+   - if `/tmp` is part of the rootfile system then Bind mount the new `/tmp` directory:
+      - Rename the original /tmp directory to keep a backup
+      ```sh
+      sudo mv /tmp /tmp_backup
+      rm -rf /tmp
+      ```
+    - Create a symbolic link:
+      ```sh
+      ln -s /mnt/newdisk/tmp/ /tmp
+      ```
+   
+
+2. Create symbolic link to store new greengrass software
+   ```sh
+   sudo ln -s /mnt/newdisk/greengrass /greengrass
+   ```
+
+
+### Step 4: Configure `/etc/fstab` for Automatic Mounting
+
+1. **Get the UUID of the Disk**:
+   - Find the UUID of the new disk:
+     ```sh
+     sudo blkid /dev/nvme1n1
+     ```
+      this shows the output something like this
+     ```sh
+     /dev/nvme1n1: UUID="8ed7081c-c2a3-4c48-a2d6-617d34c07dbd" BLOCK_SIZE="4096" TYPE="ext4"
+     ```
+2. **Edit `/etc/fstab`**:
+   - Open the `/etc/fstab` file in a text editor:
+     ```sh
+     sudo nano /etc/fstab
+     ```
+    
+3. **Add an Entry for the New Disk and Bind Mounts**:
+   - Add a line to the file with the UUID, mount point, filesystem type, and options. For example:
+     ```
+     UUID=8ed7081c-c2a3-4c48-a2d6-617d34c07dbd /mnt/newdisk ext4 defaults,nofail 0 2
+     ```
+4. Add lines to bind mount the directories:
+   ```sh
+    /mnt/newdisk/tmp /tmp none bind 0 0
+    /mnt/newdisk/greengrass /greengrass/ none bind 0 0
+
+   ```
+
+
+5. **Save and Close**:
+   - Save the changes and close the editor.
+
+6. **Test the `/etc/fstab` Entry**:
+   - Unmount the disk and then remount all filesystems using `fstab` to test the configuration:
+     ```sh
+     sudo umount /mnt/newdisk
+     sudo mount -a
+     ```
+
+7. **Verify the Mount**:
+   - Check that the disk is mounted correctly again:
+     ```sh
+     df -h
+     ```
+8. **Give execution permission to `/mnt/newdisk/tmp`
+   ```sh
+   chmod a+wrx /mnt/newdisk/tmp
+   ```
+By following these steps, you can ensure that both the `/tmp` directory and the Greengrass software directory are moved to a new 100GB disk, ensuring adequate storage space for your operations.
+
+## AWS Greegrass Lambda function languages
+AWS Greengrass V2 supports Lambda functions written in several programming languages, allowing developers to create and deploy edge applications in their preferred language. The supported programming languages for Greengrass V2 Lambda functions include:
+
+1. **Python**:
+   - Python 3.9
+   - Python 3.8
+   - Python 3.7
+   - Python 2.7
+
+2. **Node.js**:
+   - Node.js 14.x
+   - Node.js 12.x
+   - Node.js 10.x
+
+3. **Java**:
+   - Java 11
+   - Java 8
+
+4. **Go**:
+   - Go 1.x
+
+5. **.NET Core**:
+   - .NET Core 3.1
+
+6. **Ruby**:
+   - Ruby 2.7
+
+7. **Custom Runtimes**:
+   - AWS Greengrass V2 also supports custom runtimes, allowing developers to bring their own runtime by specifying an executable or a script to run their functions. This provides flexibility to use languages not natively supported by AWS.
+
+These languages cover a wide range of use cases and enable developers to leverage their existing skills and codebases when working with AWS Greengrass V2.
+# Greengrass V2 prerequisites
+
+Please make sure you follow [prerequisite page](https://docs.aws.amazon.com/greengrass/v2/developerguide/getting-started-prerequisites.html)
+
+### Create an Administrator user in IAM in AWS Console
+- Create an user with  "AdministratorAccess" policy.
+- Follow the prompts to create the user and download the credentials. These will be Access Key and Security Access Key we will use this with AWS CLI
+
+### Setup Python 3.10 
+
+To install Python 3.10 on an aarch64 (ARM64) Ubuntu system, you can follow these steps. This process involves adding the deadsnakes PPA, which contains newer versions of Python that may not be available in the default Ubuntu repositories.
+
+**NOTE**: before following these steps please check if you have python already 
+```sh
+python --version
+```
+if python is already installed you need not following python steps for installation. Please follow  below setting Python 3.10 as the Default Python Version (Optional)
+#### Step-by-Step Instructions:
+
+1. **Update the System**:
+   First, ensure that your package list is up-to-date:
+   ```sh
+   sudo apt update
+   ```
+
+2. **Install Prerequisites**:
+   Install the prerequisites for adding new repositories and managing your packages:
+   ```sh
+   sudo apt install software-properties-common
+   ```
+
+3. **Add the deadsnakes PPA**:
+   Add the deadsnakes PPA, which contains the latest Python versions:
+   ```sh
+   sudo add-apt-repository ppa:deadsnakes/ppa
+   ```
+   also there will be warning something like this 
+   ```sh
+   Warning: The unit file, source configuration file or drop-ins of apt-news.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+   Warning: The unit file, source configuration file or drop-ins of esm-cache.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+   ```
+   Run the following command 
+   ```sh
+   systemctl daemon-reload
+   ```
+
+
+
+4. **Update the Package List Again**:
+   After adding the new PPA, update your package list:
+   ```sh
+   sudo apt update
+   ```
+
+5. **Install Python 3.10**:
+   Install Python 3.10:
+   ```sh
+   sudo apt install python3.10
+   ```
+
+6. **Verify the Installation**:
+   Check the installed Python version to confirm it is installed correctly:
+   ```sh
+   python3.10 --version
+   ```
+
+#### Setting Python 3.10 as the Default Python Version (Optional)
+
+If you want to set Python 3.10 as the default Python version, you can update the alternatives system:
+
+1. **Install the Alternatives System**:
+   If not already installed, install the alternatives system:
+   ```sh
+   sudo apt install python-is-python3
+   ```
+
+2. **Update Alternatives to Use Python 3.10**:
+   Set Python 3.10 as the default python3:
+   ```sh
+   sudo update-alternatives --install /usr/bin/python3 python /usr/bin/python3.10 1
+   ```
+
+
+#### Installing Pip for Python 3.10
+
+1. **Install Pip**:
+   To install `pip` for Python 3.10, use the following command:
+   ```sh
+   sudo apt install python3.10-distutils
+   curl -sS https://bootstrap.pypa.io/get-pip.py | sudo python3.10
+   ```
+
+2. **Verify Pip Installation**:
+   Check the installed pip version:
+   ```sh
+   pip --version
+   ```
+
+By following these steps, you can successfully install Python 3.10 on your aarch64 Ubuntu system and optionally set it as the default Python version.
+
+### Install AWS CLI
+- make sure that glibc 2.25 or higher version is available by running following command
+  ```sh
+  ldd --version
+  ```
+  normally it should print version higher than 2.25 if not follow the instruction below
+  ```sh
+   sudo apt update
+   sudo apt upgrade libc6
+   ldd --version
+ ```   
+- make sure following commands works
+ ```sh
+    groff
+    less
+    unzip
+```
+if unzip doesnt work install unzip with
+```sh
+ sudo apt install unzip
+```
+change directory to your home `cd ~` 
+[Reference](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+
+```sh
+curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+
+unzip awscliv2.zip
+sudo ./aws/install
+```
+Now configure aws profile with the Admin credentials you have created earlier
+```sh
+aws configure --profile <yourEnvironment>-<yourAdminName>
+
+AWS Access Key ID [None]: <your Access Key ID for admin account in your environment>
+AWS Secret Access Key [None]: <your sccret Access Key for admin>
+Default region name [None]: ap-southeast-2
+Default output format [None]: json
+```
+Varify the version of AWS CLI
+```sh
+aws --version
+```
+This produces the output (very AWS CLI version v2.1.11 or higher)
+```sh
+aws-cli/2.15.51 Python/3.11.8 Linux/6.8.0-1008-aws exe/aarch64.ubuntu.24
+```
+
+Update default profile in environment variable `AWS_PROFILE` set this in `/etc/profile'
+
+**NOTE**
+also if you are running commands using `sudo bash` prefer running `sudo -E bash` You can preserve the environment variables when using sudo by using the -E option:
+
+Follow the following:
+[Install Java or openjdk](#install-java-or-openjdk)
 
 ## Why QEMU
 This is required to create VM of ARM Linux (Ubuntu xx.xx aarch64) in Host which is  x86_64 based. Following is the answer from `GPT 40`
@@ -546,6 +958,36 @@ sudo apt install default-jre
 sudo apt install openjdk-11-jre-headless
 sudo apt install openjdk-8-jre-headless
 ```
+
+#### apt_pkg not found issue 
+
+**NOTE** if you get get error like this 
+```plaintext
+Traceback (most recent call last):
+  File "/usr/lib/command-not-found", line 28, in <module>
+    from CommandNotFound import CommandNotFound
+  File "/usr/lib/python3/dist-packages/CommandNotFound/CommandNotFound.py", line 19, in <module>
+    from CommandNotFound.db.db import SqliteDatabase
+  File "/usr/lib/python3/dist-packages/CommandNotFound/db/db.py", line 5, in <module>
+    import apt_pkg
+ModuleNotFoundError: No module named 'apt_pkg'
+```
+
+Then you have some problem in the python installation follow these steps
+```bash
+ ls /usr/lib/python3/dist-packages/apt_pkg*.so
+ ```
+ if you get the output like following
+ ```plaintext
+ /usr/lib/python3/dist-packages/apt_pkg.cpython-312-aarch64-linux-gnu.so
+ ```
+ Then create a symbolic link 
+ ```bash
+ sudo ln -s /usr/lib/python3/dist-packages/apt_pkg.cpython-312-aarch64-linux-gnu.so /usr/local/lib/python3.10/dist-packages/apt_pkg.so
+ ```
+ Above instruction are for python 3.10 only please correct your path as per your python version now you can see
+
+
 Install Java with following command
 ```bash
 sudo apt install openjdk-8-jre
@@ -572,7 +1014,7 @@ sudo nano /etc/profile.d/java.sh
 ```
 Add the Following Lines:
 ```bash
-export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-arm64/jre/bin/
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-arm64/jre
 export PATH=$JAVA_HOME/bin:$PATH
 ````
 
@@ -778,13 +1220,18 @@ It should produce some output if yes you are done with AWS CLI configuration
 
 
 ## Running multiple instances of same qcow2 image in QEMU
+Copy the `ubuntu-arm64-clone.qcow2` to `ubuntu-arm64-clone-2.qcow2`
 Instance 1
 ```bash
-qemu-system-aarch64 -name ubuntu-arm64-1 -machine virt -cpu cortex-a53 -smp 6 -m 6177 -bios D:\arm-ubuntu-qemu\QEMU_EFI.fd -drive if=none,file=D:\arm-ubuntu-qemu\ubuntu-arm64-clone.qcow2,id=hd0,format=qcow2,snapshot=on -device virtio-blk-device,drive=hd0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-gpu -nographic -serial mon:stdio
+qemu-system-aarch64 -name ubuntu-arm64-1 -machine virt -cpu cortex-a53 -smp 6 -m 6177 -bios D:\arm-ubuntu-qemu\QEMU_EFI.fd -drive if=none,file=D:\arm-ubuntu-qemu\ubuntu-arm64-clone.qcow2,id=hd0,format=qcow2 -device virtio-blk-device,drive=hd0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-gpu -nographic -serial mon:stdio
 ```
+
+
+
+
 Instance 2
 ```bash
-qemu-system-aarch64 -name ubuntu-arm64-2 -machine virt -cpu cortex-a53 -smp 6 -m 6177 -bios D:\arm-ubuntu-qemu\QEMU_EFI.fd -drive if=none,file=D:\arm-ubuntu-qemu\ubuntu-arm64-clone.qcow2,id=hd0,format=qcow2,snapshot=on -device virtio-blk-device,drive=hd0 -device virtio-net-device,netdev=net1,mac=52:54:00:12:34:57 -netdev user,id=net1,hostfwd=tcp::2223-:22 -device virtio-gpu -nographic -serial mon:stdio
+qemu-system-aarch64 -name ubuntu-arm64-2 -machine virt -cpu cortex-a53 -smp 6 -m 6177 -bios D:\arm-ubuntu-qemu\QEMU_EFI.fd -drive if=none,file=D:\arm-ubuntu-qemu\ubuntu-arm64-clone-2.qcow2,id=hd0,format=qcow2,snapshot=on -device virtio-blk-device,drive=hd0 -device virtio-net-device,netdev=net1,mac=52:54:00:12:34:57 -netdev user,id=net1,hostfwd=tcp::2223-:22 -device virtio-gpu -nographic -serial mon:stdio
 ```
 
 Explanation of Changes

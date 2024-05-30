@@ -71,19 +71,7 @@ sudo less /greengrass/v2/logs/greengrass.log
 To ensure that Greengrass components are functioning correctly, you can use the AWS IoT Greengrass CLI or check the AWS Management Console.
 
 #### AWS IoT Greengrass CLI
-- Update Your System's CA Certificates
-  ```bash
-  sudo apt-get update
-  sudo apt-get install --reinstall ca-certificates
-  sudo update-ca-certificates
-  ```
-
-- Install greengrass cli 
-  </br> Please follow [Install GGCV2 CLI through AWS Console](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-gg-cli.html)
-
-
-
-You can use the Greengrass CLI to list components and their statuses:
+Follow this [link](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-gg-cli.html#gg-cli-deploy) to install greengrass-cli via AWS Console
 
 ```bash
 sudo /greengrass/v2/bin/greengrass-cli list-components

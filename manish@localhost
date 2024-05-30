@@ -1,12 +1,12 @@
 
 #!/bin/bash
 # Configuration variables
-THING_NAME="<yourIoT-Thing Name"
-THING_GROUP_NAME="<yourIoT-Thing group"
+THING_NAME="INFY-GCC2"
+THING_GROUP_NAME="INFY-GCC2_ggcv2_group"
 CERTIFICATE_NAME="${THING_NAME}_certificate.pem.crt"
 PRIVATE_KEY_NAME="${THING_NAME}_private.pem.key"
-CERTIFICATE_URL="https://<server_url>/${CERTIFICATE_NAME}"
-PRIVATE_KEY_URL="https://<server_url>/${PRIVATE_KEY_NAME}"
+CERTIFICATE_URL="https://d21h343md4a9cm.cloudfront.net/iot/things/${CERTIFICATE_NAME}"
+PRIVATE_KEY_URL="https://d21h343md4a9cm.cloudfront.net/iot/things/${PRIVATE_KEY_NAME}"
 ROOT_CA_URL="https://www.amazontrust.com/repository/AmazonRootCA1.pem"
 GREENGRASS_INSTALL_DIR="/greengrass/v2"
 GREENGRASS_CONFIG_FILE="$GREENGRASS_INSTALL_DIR/config.yaml"
@@ -70,7 +70,7 @@ unzip greengrass-v2-latest.zip -d $GREENGRASS_INSTALL_DIR
 rm greengrass-v2-latest.zip
 
 # Get the Greengrass version
-GREENGRASS_VERSION=$(java -jar $GREENGRASS_INSTALL_DIR/lib/Greengrass.jar --version | awk '{print $3}' | sed 's/^v//')
+GREENGRASS_VERSION=$(java -jar $GREENGRASS_INSTALL_DIR/lib/Greengrass.jar --version | awk '{print $3}')
 
 if [ -z "$GREENGRASS_VERSION" ]; then
     echo "Failed to retrieve Greengrass version"
